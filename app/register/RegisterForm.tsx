@@ -1,15 +1,12 @@
 "use client";
 
 import { useActionState } from "react";
-import { validateRegisterInput, type RegisterFormState } from "./actions";
+import { register, type RegisterFormState } from "@/app/actions/auth";
 
 const initialState: RegisterFormState = { errors: {} };
 
 export function RegisterForm() {
-  const [state, formAction, pending] = useActionState(
-    validateRegisterInput,
-    initialState
-  );
+  const [state, formAction, pending] = useActionState(register, initialState);
 
   return (
     <form action={formAction} className="flex w-full max-w-sm flex-col gap-4">
