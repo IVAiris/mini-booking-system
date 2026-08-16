@@ -1,6 +1,16 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Link from "next/link";
 import "./globals.css";
+
+const navItems = [
+  { href: "/register", label: "Регистрация" },
+  { href: "/login", label: "Вход" },
+  { href: "/account", label: "Аккаунт" },
+  { href: "/slots", label: "Слоты" },
+  { href: "/account/bookings", label: "Мои записи" },
+  { href: "/admin", label: "Админка" },
+];
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,7 +33,20 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <nav className="flex flex-wrap gap-4 border-b border-black/[.08] px-6 py-4 text-sm dark:border-white/[.145]">
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="font-medium text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-zinc-50"
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+        {children}
+      </body>
     </html>
   );
 }

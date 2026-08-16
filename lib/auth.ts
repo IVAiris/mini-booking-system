@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
+import { notFound, redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
-import { PrismaClient } from "@/app/generated/prisma/client";
+import { PrismaClient, type Role, type User } from "@/app/generated/prisma/client";
 
 export const prisma = new PrismaClient();
 
@@ -46,4 +47,42 @@ export async function destroySession(): Promise<void> {
   }
 
   cookieStore.delete(SESSION_COOKIE_NAME);
+}
+
+export async function getCurrentUser(): Promise<User | null> {
+  const cookieStore = await cookies();
+  const sessionToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+
+  if (!sessionToken) {
+    return null;
+  }
+
+  const session = await prisma.session.findUnique({
+    where: { sessionToken },
+    include: { user: true },
+  });
+
+  if (!session || session.expiresAt < new Date()) {
+    return null;
+  }
+
+  return session.user;
+}
+
+// Без сессии — редирект на /login; при несоответствии роли — notFound() (не раскрывает факт существования раздела).
+export async function requireRole(
+  allowedRoles: Role | Role[]
+): Promise<User> {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
+  if (!roles.includes(user.role)) {
+    notFound();
+  }
+
+  return user;
 }
