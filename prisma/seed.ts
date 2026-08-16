@@ -21,16 +21,37 @@ async function main() {
 
   if (existing) {
     console.log("super_admin уже существует, пропускаю создание.");
+  } else {
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    await prisma.user.create({
+      data: { name, email, passwordHash, role: "super_admin" },
+    });
+
+    console.log("super_admin создан.");
+  }
+
+  await seedDemoSlot();
+}
+
+async function seedDemoSlot() {
+  const demoSlotStart = new Date("2026-09-01T10:00:00.000Z");
+  const demoSlotEnd = new Date("2026-09-01T11:00:00.000Z");
+
+  const existingSlot = await prisma.slot.findFirst({
+    where: { startTime: demoSlotStart },
+  });
+
+  if (existingSlot) {
+    console.log("Демо-слот уже существует, пропускаю создание.");
     return;
   }
 
-  const passwordHash = await bcrypt.hash(password, 12);
-
-  await prisma.user.create({
-    data: { name, email, passwordHash, role: "super_admin" },
+  await prisma.slot.create({
+    data: { startTime: demoSlotStart, endTime: demoSlotEnd },
   });
 
-  console.log("super_admin создан.");
+  console.log("Демо-слот создан.");
 }
 
 main()
