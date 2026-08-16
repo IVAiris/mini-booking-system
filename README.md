@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Mini Booking System
 
-## Getting Started
+Учебный сервис онлайн-записи на слоты. Текущий модуль — **auth-lite**: регистрация, вход и роли (`user`/`admin`/`super_admin`). Продуктовая логика и критерии готовности модуля — в [`spec.md`](./spec.md); порядок работы и статусы шагов — в [`Plan.md`](./Plan.md).
 
-First, run the development server:
+## Стек
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Next.js 16.3.1, React 19.2.8, TypeScript, Tailwind CSS 4, Zod, Prisma/`@prisma/client` 6.19.3 (точная версия), bcryptjs, PostgreSQL, npm.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Запуск локально
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Установить зависимости:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+   ```bash
+   npm install
+   ```
 
-## Learn More
+2. Скопировать `.env.example` в `.env` и заполнить реальными значениями:
 
-To learn more about Next.js, take a look at the following resources:
+   ```bash
+   cp .env.example .env
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+   - `DATABASE_URL` — строка подключения к локальной PostgreSQL.
+   - `SEED_SUPER_ADMIN_NAME` / `SEED_SUPER_ADMIN_EMAIL` / `SEED_SUPER_ADMIN_PASSWORD` — данные единственного `super_admin`, создаваемого seed-скриптом (пароль ≥8 символов).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3. Применить миграции:
 
-## Deploy on Vercel
+   ```bash
+   npx prisma migrate dev
+   ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+4. Засеять единственного `super_admin` (идемпотентно — повторный запуск не создаёт дубликат):
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+   ```bash
+   npx prisma db seed
+   ```
+
+5. Запустить dev-сервер:
+
+   ```bash
+   npm run dev
+   ```
+
+   Открыть [http://localhost:3000](http://localhost:3000).
+
+## Проверки
+
+- `npm run lint` — статический анализ (ESLint).
+- `npm run build` — сборка + проверка типов TypeScript.
+- Автоматических тестов и CI в проекте нет — сценарии проверяются вручную (см. ниже).
+
+## Smoke-тест auth-lite
+
+Ручной прогон, соответствующий критериям успеха `spec.md` (раздел 10). Выполнен и подтверждён на этом шаге:
+
+| # | Критерий | Как проверено | Результат |
+|---|---|---|---|
+| 1 | Публичная регистрация создаёт пользователя строго с ролью `user`, даже если в запросе передано другое значение `role` | Регистрация через `/register` с полем `role=super_admin` в теле запроса | Роль в БД — `user`; пароль сохранён как bcrypt-хеш (12 раундов), не в открытом виде |
+| 2 | Вход выдаёт рабочую серверную сессию (`Session` + cookie); выход её инвалидирует | Вход через `/login` → запись `Session` + `httpOnly` cookie; выход кнопкой «Выйти» на `/account` | Cookie получает истёкший срок действия, запись `Session` удаляется из БД; повторный запрос с тем же (уже недействительным) cookie получает отказ |
+| 3 | `/account` недоступна без авторизации, показывает данные только владельца сессии | Запрос к `/account` без cookie; запрос с валидной сессией | Без сессии — редирект на `/login`; с сессией — отображаются имя/email именно вошедшего пользователя |
+| 4 | Обращение к административному разделу без роли `admin`/`super_admin` блокируется на сервере, независимо от видимости пункта меню | Пользователь с ролью `user` (пункт «Админка» виден в навигации) переходит на `/admin` | Сервер отвечает `404` (`requireRole` вызывает `notFound()`), без сессии — сначала редирект на `/login` |
+| 5 | После запуска seed в БД существует ровно один `super_admin`; повторный запуск seed не создаёт второго | `npx prisma db seed` запущен дважды подряд | Первый запуск создаёт `super_admin`, второй — выводит «уже существует, пропускаю создание»; в БД ровно одна запись с ролью `super_admin` |
+| 6 | Prisma и `@prisma/client` зафиксированы версией `6.19.3` без диапазонов | `package.json` → `dependencies`/`devDependencies` | `"prisma": "6.19.3"`, `"@prisma/client": "6.19.3"` — точные версии, без `^`/`~` |
+
+Все 6 критериев пройдены.
